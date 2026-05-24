@@ -4,9 +4,31 @@
         <link rel="stylesheet" href="styles.css"></link>
     </head>
     <body>
-        <h1>
-            Super cool physics simulation
-        </h1>
+        <div class="topbar">
+            <h1 class="title">
+                Super cool physics simulation
+            </h1>
+            <div class="slidecontainer">
+                <a>Size</a>
+                <input type="range" min="500" max="7000" value="3000" class="slider" id="sizeSlider">
+            </div>
+            <div class="slidecontainer">
+                <a>Repel Distance</a>
+                <input type="range" min="1000" max="6000" value="2500" class="slider" id="baseRepelSlider">
+            </div>
+            <div class="slidecontainer">
+                <a>Separation</a>
+                <input type="range" min="500" max="2000" value="1600" class="slider" id="repelSlider">
+            </div>
+            <div class="slidecontainer">
+                <a>Drag</a>
+                <input type="range" min="600" max="1000" value="950" class="slider" id="dragSlider">
+            </div>
+            <div class="slidecontainer">
+                <a>Pull</a>
+                <input type="range" min="0" max="400" value="200" class="slider" id="pullSlider">
+            </div>
+        </div>
         <canvas id="canvas">
         </canvas>
     </body>

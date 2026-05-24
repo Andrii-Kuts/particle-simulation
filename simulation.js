@@ -4,20 +4,27 @@
 // group - logical
 // size (radius)
 
-const centralForceScale = 0.00001;
-const dragCoefficient = 0.9;
-const baseRepelDistance = 35;
-const groupRepelDistance = 60;
+const repelSlider = document.getElementById("repelSlider");
+const baseRepelSlider = document.getElementById("baseRepelSlider");
+const sizeSlider = document.getElementById("sizeSlider");
+const dragSlider = document.getElementById("dragSlider");
+const pullSlider = document.getElementById("pullSlider");
+
+let centralForce = 0.00002;
+let dragCoefficient = 0.95;
+let baseRepelDistance = 25;
+let repelCoefficient = 1.6;
+let maxRepelDistance = baseRepelDistance;
 const repelForce = 0.01;
-const cursorRepelDistance = 150;
+const cursorRepelDistance = 50;
 const cursorRepelForce = 2;
-const swirlDistance = 300;
-const swirlForce = 1;
-const edgeDistance = baseRepelDistance;
+const baseSwirlDistance = 200;
+const swirlDistanceIncrement = 5;
+const swirlForce = 0.25;
 const capitalEdgeDistance = 115;
 const particleEdgeLimit = 3;
 const virusColor = "#770000"
-const capitalEdgeColor = "#1e1439";
+const capitalEdgeColor = "#584e77";
 
 class Particle {
     constructor(x, y, size, color, group, capital, virus) {
@@ -54,6 +61,7 @@ class Particle {
         ctx.strokeStyle = virus ? virusColor
             : this.group != anotherParticle.group ? capitalEdgeColor 
             : this.color;
+        // ctx.strokeStyle = capitalEdgeColor;
         ctx.lineWidth = virus ? 2.0 : 1.0;
         ctx.moveTo(this.x, this.y);
         ctx.lineTo(anotherParticle.x, anotherParticle.y);
@@ -70,23 +78,30 @@ class Particle {
 particles = [];
 cursor = { x: -1000, y: -1000 }
 isPressed = false;
+swirlDistance = baseSwirlDistance;
 
 function generateParticles(canvas) {
-    const count = 10000;
-    const colors = ['#09C2FF', '#9112FF', '#FFF400', '#FF8300'];
-    const spread = 2000;
-    const capitalProbability = 1/50;
+    const count = 5000;
+    const colors = [
+        '#098cff',
+        '#9112FF',
+        '#15ff2c',
+        '#2ef5ff',
+        '#FFF400',
+        '#ff952a',
+        '#fc1484',
+        '#ff1900',
+    ];
+    const spreadX = 2000;
+    const spreadY = 1000;
+    const size = 3;
 
     for(let i = 0; i < count; i++) {
-        // x, y are between -100 and +100
-        const colorGroup = Math.floor(Math.random() * 4)
-        const isCapital = Math.random() < capitalProbability;
-        // const radius = ;
-
+        const colorGroup = Math.floor(Math.random() * 8);
         particles.push(new Particle(
-            Math.random() * spread - spread / 2.0 + canvas.width / 2.0,
-            Math.random() * spread - spread / 2.0 + canvas.height / 2.0,
-            isCapital ? 6 : 2,
+            Math.random() * spreadX - spreadX / 2.0 + canvas.width / 2.0,
+            Math.random() * spreadY - spreadY / 2.0 + canvas.height / 2.0,
+            size,
             colors[colorGroup],
             colorGroup,
             false,
@@ -94,9 +109,9 @@ function generateParticles(canvas) {
         ));
     }
 
-    const greenBall = new Particle(50, 50, 15, "white", -1, true, true);
-    greenBall.mass = 1000;
-    particles.push(greenBall);
+    // const greenBall = new Particle(50, 50, 15, "white", -1, true, false);
+    // greenBall.mass = 1000;
+    // particles.push(greenBall);
 }
 
 function renderEdges(ctx, edgeDistance, edgeCount, particleFilter, filter) {
@@ -164,18 +179,39 @@ function renderEdges(ctx, edgeDistance, edgeCount, particleFilter, filter) {
 function render(ctx) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    renderEdges(ctx, edgeDistance, particleEdgeLimit, p => true, (a, b) => a.group == b.group, false);
+    renderEdges(ctx, baseRepelDistance + 5.0, particleEdgeLimit, p => true, (a, b) => a.group == b.group, false);
     renderEdges(ctx, capitalEdgeDistance, 1000, p => p.capital, (a, b) => a.capital || b.capital, true);
 
     for(let particle of particles) {
         particle.render(ctx);
     }
+}
 
-    
+function getRepelDistance(group1, group2) {
+    let xr = group1 ^ group2;
+    let res = 1;
+    while(xr > 0) {
+        res *= repelCoefficient;
+        xr = Math.floor(xr / 2);
+    }
+    return res * baseRepelDistance;
+}
+
+function tickSliders() {
+    baseRepelDistance = baseRepelSlider.value / 100.0;
+    repelCoefficient = repelSlider.value / 1000.0;
+    maxRepelDistance = Math.max(baseRepelDistance, baseRepelDistance * Math.pow(repelCoefficient, 3)) + 15.0;
+    dragCoefficient = dragSlider.value / 1000.0;
+    centralForce = pullSlider.value / 1000000.0;
+
+    const size = sizeSlider.value / 1000.0;
+    for(let particle of particles) {
+        particle.size = size;
+    }
 }
 
 // physics stuff
-function tick(canvas) {
+function tickPhysics(canvas) {
     const centerX = canvas.width / 2.0;
     const centerY = canvas.height / 2.0;
 
@@ -184,7 +220,7 @@ function tick(canvas) {
     // grid cell = {x, y} DOESNT WORK! {0, 0} != {0, 0}
     // cell index = x * 1000000000 + y DOES WORK!
     const grid = new Map();
-    const gridSize = groupRepelDistance + 15.0;
+    const gridSize = maxRepelDistance + 15.0;
 
     for(let particle of particles) {
         const gx = Math.floor(particle.x / gridSize);
@@ -196,9 +232,14 @@ function tick(canvas) {
         grid.get(index).push(particle);
     }
 
+    if(!isPressed)
+        swirlDistance = baseSwirlDistance;
+    else
+        swirlDistance += swirlDistanceIncrement;
+
     for(let particle of particles) {
-        const fx = (centerX - particle.x) * centralForceScale;
-        const fy = (centerY - particle.y) * centralForceScale;
+        const fx = (centerX - particle.x) * centralForce;
+        const fy = (centerY - particle.y) * centralForce;
         
         // applying force to particle velocity
         particle.vx += fx;
@@ -228,9 +269,8 @@ function tick(canvas) {
                     // const d = Math.sqrt(d2);
 
                     // particles are too far away to be repelled
-                    const repelDistance = (particle.group == anotherParticle.group) ?
-                        baseRepelDistance :
-                        groupRepelDistance;
+
+                    const repelDistance = getRepelDistance(particle.group, anotherParticle.group);
                     if(d > repelDistance)
                         continue;
 
@@ -280,6 +320,11 @@ function tick(canvas) {
         particle.x += particle.vx;
         particle.y += particle.vy;
     }
+}
+
+function tick(canvas) {
+    tickSliders();
+    tickPhysics(canvas);
 }
 
 function prepare(canvas) {
